@@ -1,51 +1,103 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Google Photos Album</title>
-    <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-            background-color: #000;
-        }
-        img {
-            display: block;
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Personal Album Viewer</title>
+  <style>
+    body {
+      margin: 0;
+      background: #000;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+      font-family: Arial, sans-serif;
+      color: #fff;
+    }
+    img {
+      width: 30%;
+      margin: 5px;
+      border-radius: 8px;
+      object-fit: cover;
+    }
+    button {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+      z-index: 100;
+      border-radius: 5px;
+      border: none;
+      background-color: #4285f4;
+      color: #fff;
+    }
+  </style>
 </head>
 <body>
-    <div id="photos-container"></div>
 
-    <script>
-        // Example URL to your album. Replace this with your actual shareable link.
-        const albumUrl = 'https://photos.app.goo.gl/mvKia6EJwrYaNu7R9';
+  <button id="login">Sign in with Google</button>
+  <div id="photos-container"></div>
 
-        async function fetchPhotos() {
-            // Fetch the Google Photos album data using the shareable link
-            const response = await fetch(albumUrl);
-            const data = await response.json();
-            const images = data.items; // Adjust based on API response
+  <!-- Google Identity Services -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  
+  <script>
+    const CLIENT_ID = "920606347277-ujm0k5j5kftdejq8ib3aun4o4gtsk1fi.apps.googleusercontent.com"; // Replace with your OAuth Client ID
+    const SCOPES = "https://www.googleapis.com/auth/photoslibrary.readonly";
 
-            const container = document.getElementById('photos-container');
-            container.innerHTML = ''; // Clear the container before adding new photos
+    let tokenClient;
 
-            // Loop through photos and add them to the page
-            images.forEach(image => {
-                const imgElement = document.createElement('img');
-                imgElement.src = image.url; // Use the correct image URL format
-                container.appendChild(imgElement);
-            });
+    // Initialize Google Identity Services token client
+    window.onload = function() {
+      tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: CLIENT_ID,
+        scope: SCOPES,
+        callback: (response) => {
+          if (response.error) {
+            console.error(response);
+            return;
+          }
+          // Token received, now load photos
+          listPhotos(response.access_token);
         }
+      });
+    };
 
-        // Set an interval to fetch new photos every 10 minutes
-        setInterval(fetchPhotos, 10 * 60 * 1000); // 10 minutes interval
+    // Sign in button click
+    document.getElementById("login").addEventListener("click", () => {
+      tokenClient.requestAccessToken();
+    });
 
-        fetchPhotos();  // Initial fetch when the page loads
-    </script>
+    // Fetch photos from Google Photos Library API
+    async function listPhotos(accessToken) {
+      const container = document.getElementById("photos-container");
+      container.innerHTML = ""; // clear previous
+
+      const res = await fetch('https://photoslibrary.googleapis.com/v1/mediaItems?pageSize=50', {
+        headers: {
+          'Authorization': 'Bearer ' + accessToken
+        }
+      });
+
+      const data = await res.json();
+      const photos = data.mediaItems || [];
+
+      if (photos.length === 0) {
+        container.innerHTML = "<p>No photos found in your library.</p>";
+        return;
+      }
+
+      photos.forEach(photo => {
+        const img = document.createElement("img");
+        img.src = `${photo.baseUrl}=w800-h800`; // adjust size
+        container.appendChild(img);
+      });
+    }
+  </script>
+
 </body>
 </html>
